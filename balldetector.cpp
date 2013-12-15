@@ -96,6 +96,11 @@ static MyLine Diagonal(cv::Mat& image, cv::Mat& orig, int x, int y)
 }
 }
 
+Balldetector::Balldetector(int minDiameter, int maxDiameter, double tolerence)
+{
+
+}
+
 void Balldetector::Recurse(Circle& circle, cv::Mat& image, cv::Mat& orig, Balldetector::Axis axis, int x, int y, int xMax, int yMax)
 {
     if (axis == AXIS_X) {
@@ -131,7 +136,7 @@ void Balldetector::Recurse(Circle& circle, cv::Mat& image, cv::Mat& orig, Ballde
 
 Balldetector::Ball Balldetector::Detect(cv::Mat& image)
 {
-    Circle ball = {0,0,0};
+    Ball ball = {0,0,0};
 
     cv::Mat hsv;
     cv::Mat red;
@@ -167,7 +172,9 @@ Balldetector::Ball Balldetector::Detect(cv::Mat& image)
                 if (detected.radius > 20) {
 
                     circle( image, cv::Point(detected.x, detected.y), detected.radius / 2, cv::Scalar(0,255,0), 3, 8, 0 );
-                    ball = detected;
+                    ball.radius = detected.radius;
+                    ball.x = detected.x;
+                    ball.y = detected.y;
                     j += ball.radius;
                     i += ball.radius;
                     return ball;

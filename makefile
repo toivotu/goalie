@@ -1,5 +1,5 @@
 all:
-	mkdir -p build
+	mkdir -p  build
 	cd build && cmake .. -G "MSYS Makefiles"
 	cd build && make
 	

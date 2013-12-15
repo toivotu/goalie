@@ -19,7 +19,7 @@ public:
     } Ball;
 
 
-    Balldetector(int minMiameter, int maxDiameter, double tolerance);
+    Balldetector(int minDiameter, int maxDiameter, double tolerance);
     Ball Detect(cv::Mat& image);
 
     void SetTolerance(double tolerance);
