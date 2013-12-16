@@ -10,6 +10,8 @@
 
 #include "opencv2/opencv.hpp"
 
+#include "ifilter.hpp"
+
 class Balldetector {
 public:
     typedef struct {
@@ -19,13 +21,14 @@ public:
     } Ball;
 
 
-    Balldetector(int minDiameter, int maxDiameter, double tolerance);
+    Balldetector(const IFilter* filter, int minDiameter, int maxDiameter, double tolerance);
     Ball Detect(cv::Mat& image);
 
     void SetTolerance(double tolerance);
 
-
 private:
+    const IFilter* filter;
+
     typedef enum {
         AXIS_X,
         AXIS_Y

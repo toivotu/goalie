@@ -5,9 +5,6 @@
  *      Author: Mafioso
  */
 
-#ifndef BALLDETECTOR_CPP_
-#define BALLDETECTOR_CPP_
-
 #include "balldetector.hpp"
 
 namespace {
@@ -96,7 +93,8 @@ static MyLine Diagonal(cv::Mat& image, cv::Mat& orig, int x, int y)
 }
 }
 
-Balldetector::Balldetector(int minDiameter, int maxDiameter, double tolerence)
+Balldetector::Balldetector(const IFilter* _filter, int _minDiameter, int _maxDiameter, double _tolerence):
+    filter(_filter)
 {
 
 }
@@ -141,13 +139,9 @@ Balldetector::Ball Balldetector::Detect(cv::Mat& image)
     cv::Mat hsv;
     cv::Mat red;
 
-    cv::cvtColor(image, hsv, CV_RGB2HSV);
-    //GaussianBlur(hsv, hsv, Size(9, 9), 2, 2);
-    cv::inRange(hsv, cv::Scalar(109,167,46), cv::Scalar(132, 255, 158), red);
-    //imshow("blur", red);
-    imshow("bw", red);
+    filter->Evaluate(image, red);
 
-   // std::cout << image.rows << " " <<image.cols << std::endl;
+    imshow("bw", red);
 
     for (int i = 0; i < image.cols; i += 5) {
         for (int j = 0; j < image.rows; j +=5) {
@@ -183,12 +177,6 @@ Balldetector::Ball Balldetector::Detect(cv::Mat& image)
         }
     }
 
-    //std::cout << (int)red.at<unsigned char>(1, 1) << std::endl;
-    imshow("bw", red);
-
     return ball;
 }
 
-
-
-#endif /* BALLDETECTOR_CPP_ */

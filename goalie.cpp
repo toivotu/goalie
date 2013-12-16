@@ -15,6 +15,8 @@
 #include "opencv2/opencv.hpp"
 #include "opencv2/highgui/highgui.hpp"
 
+#include "hsvfilter.hpp"
+#include "rgbfilter.hpp"
 #include "balldetector.hpp"
 
 using std::vector;
@@ -59,13 +61,18 @@ int main (int argc, char** argv)
 
     std::cout << "Starting" << std::endl;
 
-    //if (video.open("rtsp://doorguard:8554/")) {
-    if (video.open("rtsp://192.168.0.232:8554/")) {
+    if (video.open("rtsp://doorguard:8554/")) {
 
         cv::Mat frame;
         Median filterTime(10);
 
-        Balldetector detector(5, 100, 0.2f);
+        //RgbFilter rFilter;
+        //rFilter.SetLimits(cv::Scalar(0,0,0), cv::Scalar(255, 255, 255));
+
+        HsvFilter filter;
+        filter.SetLimits(cv::Scalar(109,167,46), cv::Scalar(132, 255, 158));
+
+        Balldetector detector(&filter, 5, 100, 0.2f);
 
         namedWindow("bw");
         namedWindow("output");

@@ -11,7 +11,11 @@ link_directories (${GOALIE_SOURCE_DIR}/opencv/lib)
 
 SET (OPENCV-VER 246d)
 
-add_executable (goalie goalie.cpp balldetector.cpp)
+add_executable (goalie 
+    goalie.cpp 
+    balldetector.cpp
+    hsvfilter.cpp
+    rgbfilter.cpp)
 
 add_custom_command(TARGET goalie POST_BUILD
     COMMAND cp ${GOALIE_SOURCE_DIR}/opencv/bin/opencv_ffmpeg246.dll ${EXECUTABLE_OUTPUT_PATH}/opencv_ffmpeg246.dll
