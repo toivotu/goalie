@@ -18,6 +18,7 @@ public:
     virtual ~HsvFilter();
 
     virtual void Evaluate(const cv::Mat& imgIn, cv::Mat& imgOut) const;
+    virtual bool IsInRage(uint8_t* pixel) const;
 
     void SetLimits(const cv::Scalar& min, const cv::Scalar& max);
 

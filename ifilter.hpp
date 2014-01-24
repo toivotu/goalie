@@ -13,7 +13,10 @@
 class IFilter
 {
 public:
+    virtual ~IFilter() {}
+
     virtual void Evaluate(const cv::Mat& ImgIn, cv::Mat& imgOut) const = 0;
+    virtual bool IsInRage(uint8_t* pixel) const = 0;
 };
 
 
