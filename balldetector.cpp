@@ -34,17 +34,17 @@ private:
 
 };
 
-Line HLine(cv::Mat& image, cv::Mat& orig, int x, int y)
+Line HLine(const IFilter* filter, cv::Mat& image, cv::Mat& orig, int x, int y)
 {
     int xMin = x;
     int xMax = x;
 
-    while ((xMin > 1) && image.data[xMin - 1 + y * image.cols] == 255u) {
+    while ((xMin > 1) && filter->IsInRage(&image.data[(xMin - 1 + y * image.cols) * 3])) {
         orig.data[(xMin + orig.cols * y) * 3] = 255;
         xMin--;
     }
 
-    while ((xMax < image.cols - 1) && image.data[xMax - 1 + y * image.cols] == 255u) {
+    while ((xMax < image.cols - 1) && filter->IsInRage(&image.data[(xMax - 1 + y * image.cols) * 3])) {
         orig.data[(xMax + orig.cols * y) * 3] = 255;
         xMax++;
     }
@@ -52,17 +52,17 @@ Line HLine(cv::Mat& image, cv::Mat& orig, int x, int y)
     return Line(xMin, xMax);
 }
 
-Line VLine(cv::Mat& image, cv::Mat& orig, int x, int y)
+Line VLine(const IFilter* filter, cv::Mat& image, cv::Mat& orig, int x, int y)
 {
     int yMin = y;
     int yMax = y;
 
-    while ((yMin > 1) && image.data[x + yMin * image.cols] == 255u) {
+    while ((yMin > 1) && filter->IsInRage(&image.data[(x + yMin * image.cols) * 3])) {
         orig.data[(x + orig.cols * yMin) * 3] = 255;
         yMin--;
     }
 
-    while ((yMax < image.rows - 1) && image.data[x - 1 + yMax * image.cols] == 255u) {
+    while ((yMax < image.rows - 1) && filter->IsInRage(&image.data[(x - 1 + yMax * image.cols) * 3])) {
         orig.data[(x + orig.cols * yMax) * 3] = 255;
         yMax++;
     }
@@ -70,7 +70,7 @@ Line VLine(cv::Mat& image, cv::Mat& orig, int x, int y)
     return Line(yMin, yMax);
 }
 
-static MyLine Diagonal(cv::Mat& image, cv::Mat& orig, int x, int y)
+MyLine Diagonal(const IFilter* filter, cv::Mat& image, cv::Mat& orig, int x, int y)
 {
     orig.data[(x + orig.cols * y) * 3 + 2] = 255;
     int xMin = x;
@@ -78,13 +78,13 @@ static MyLine Diagonal(cv::Mat& image, cv::Mat& orig, int x, int y)
     int yMin = y;
     int yMax = y + 1;
 
-    while ((xMin > 0) && (yMin > 0) && image.data[xMin + yMin * image.cols] == 255u) {
+    while ((xMin > 0) && (yMin > 0) && filter->IsInRage(&image.data[(xMin + yMin * image.cols) *3])) {
         orig.data[(xMin + orig.cols * yMin) * 3] = 255;
         xMin--;
         yMin--;
     }
 
-    while ((xMax < image.cols - 1) && (yMax < image.rows - 1) && image.data[xMax + yMax * image.cols] == 255u) {
+    while ((xMax < image.cols - 1) && (yMax < image.rows - 1) && filter->IsInRage(&image.data[(xMax + yMax * image.cols) * 3])) {
         orig.data[(xMax + orig.cols * yMax) * 3] = 255;
         xMax++;
         yMax++;
@@ -104,7 +104,7 @@ void Balldetector::Recurse(Circle& circle, cv::Mat& image, cv::Mat& orig, Ballde
 {
     if (axis == AXIS_X) {
 
-        Line xLine = HLine(image, orig, x, y);
+        Line xLine = HLine(filter, image, orig, x, y);
 
         circle.x = x;
         circle.y = y;
@@ -117,7 +117,7 @@ void Balldetector::Recurse(Circle& circle, cv::Mat& image, cv::Mat& orig, Ballde
 
     } else {
 
-        Line yLine = VLine(image, orig, x, y);
+        Line yLine = VLine(filter, image, orig, x, y);
 
         circle.x = x;
         circle.y = y;
@@ -137,19 +137,15 @@ Balldetector::Ball Balldetector::Detect(cv::Mat& image)
 {
     Ball ball = {0,0,0};
 
-    cv::Mat hsv;
-    cv::Mat red;
+    cv::Mat red;// = image;
+    image.copyTo(red);
 
-    filter->Evaluate(image, red);
-
-    imshow("bw", red);
+    //filter->Evaluate(image, red);
 
     for (int i = 0; i < image.cols; i += step) {
-        for (int j = 0; j < image.rows; j += step) {
-             if (red.data[i + image.cols * j] == 255u) {
+        for (int j = 0; j < image.rows; j += step ) {
+             if (filter->IsInRage(&red.data[(i + image.cols * j) * 3])) {
                 image.data[(i + image.cols * j) * 3] = 255;
-
-                Line line = HLine(red, image, i, j);
                 Circle detected = {0,0,0,0,0};
 
                 detected.radius = 0;
@@ -158,8 +154,7 @@ Balldetector::Ball Balldetector::Detect(cv::Mat& image)
                 if (abs(1.f - (double)detected.xWidth / (double)detected.yWidth) < tolerance) {
                     detected.radius = (detected.xWidth + detected.yWidth) / 2;
 
-                    MyLine diag = Diagonal(red, image, detected.x, detected.y);
-
+                    MyLine diag = Diagonal(filter, red, image, detected.x, detected.y);
 
                     if (detected.radius > 0  && abs(1.f - (double)detected.radius / (double)(diag.second.x - diag.first.x) * 0.707f) > tolerance) {
                         detected.radius = 0;
@@ -173,12 +168,15 @@ Balldetector::Ball Balldetector::Detect(cv::Mat& image)
                         ball.y = detected.y;
                         j += ball.radius;
                         i += ball.radius;
+                        imshow("bw", red);
                         return ball;
                     }
                 }
             }
         }
     }
+
+    imshow("bw", red);
 
     return ball;
 }
