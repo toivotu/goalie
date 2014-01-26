@@ -28,6 +28,6 @@ void RgbFilter::Evaluate(const cv::Mat& imgIn, cv::Mat& imgOut) const
 {
     //GaussianBlur(hsv, hsv, Size(9, 9), 2, 2);
     cv::inRange(imgIn, min, max, imgOut);
-    //cv::erode(imgOut, imgOut, cv::Mat());
-    //cv::dilate(imgOut, imgOut,  cv::Mat());
+    cv::erode(imgOut, imgOut, cv::Mat());
+    cv::dilate(imgOut, imgOut,  cv::Mat());
 }

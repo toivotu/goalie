@@ -72,14 +72,15 @@ Line VLine(cv::Mat& image, cv::Mat& orig, int x, int y)
 
 static MyLine Diagonal(cv::Mat& image, cv::Mat& orig, int x, int y)
 {
+    orig.data[(x + orig.cols * y) * 3 + 2] = 255;
     int xMin = x;
-    int xMax = x;
+    int xMax = x + 1;
     int yMin = y;
-    int yMax = y;
+    int yMax = y + 1;
 
-    while ((xMin > 1) && (yMin > 1) && image.data[xMin + yMin * image.cols] == 255u) {
+    while ((xMin > 0) && (yMin > 0) && image.data[xMin + yMin * image.cols] == 255u) {
         orig.data[(xMin + orig.cols * yMin) * 3] = 255;
-        yMin--;
+        xMin--;
         yMin--;
     }
 
@@ -153,25 +154,27 @@ Balldetector::Ball Balldetector::Detect(cv::Mat& image)
 
                 detected.radius = 0;
                 Recurse(detected, red, image, AXIS_X, i, j, 0, 0);
-                MyLine diag = Diagonal(red, image, detected.x, detected.y);
 
-                if (abs(1.f - (double)detected.xWidth / (double)detected.yWidth) < 0.3) {
+                if (abs(1.f - (double)detected.xWidth / (double)detected.yWidth) < tolerance) {
                     detected.radius = (detected.xWidth + detected.yWidth) / 2;
-                }
 
-                if (detected.radius > 0  && abs(1.f - (double)detected.radius / (double)(diag.second.x - diag.first.x) * 0.707f) > 0.3) {
-                    detected.radius = 0;
-                }
+                    MyLine diag = Diagonal(red, image, detected.x, detected.y);
 
-                if (detected.radius > 20) {
 
-                    circle( image, cv::Point(detected.x, detected.y), detected.radius / 2, cv::Scalar(0,255,0), 3, 8, 0 );
-                    ball.radius = detected.radius;
-                    ball.x = detected.x;
-                    ball.y = detected.y;
-                    j += ball.radius;
-                    i += ball.radius;
-                    return ball;
+                    if (detected.radius > 0  && abs(1.f - (double)detected.radius / (double)(diag.second.x - diag.first.x) * 0.707f) > tolerance) {
+                        detected.radius = 0;
+                    }
+
+                    if (detected.radius > 20) {
+
+                        circle( image, cv::Point(detected.x, detected.y), detected.radius / 2, cv::Scalar(0,255,0), 3, 8, 0 );
+                        ball.radius = detected.radius;
+                        ball.x = detected.x;
+                        ball.y = detected.y;
+                        j += ball.radius;
+                        i += ball.radius;
+                        return ball;
+                    }
                 }
             }
         }

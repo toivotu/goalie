@@ -28,6 +28,7 @@ public:
 
 private:
     const IFilter* filter;
+    double tolerance;
 
     typedef enum {
         AXIS_X,

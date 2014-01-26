@@ -66,13 +66,10 @@ int main (int argc, char** argv)
         cv::Mat frame;
         Median filterTime(10);
 
-        //RgbFilter rFilter;
-        //rFilter.SetLimits(cv::Scalar(0,0,0), cv::Scalar(255, 255, 255));
-
         HsvFilter filter;
         filter.SetLimits(cv::Scalar(109,167,46), cv::Scalar(132, 255, 158));
 
-        Balldetector detector(&filter, 5, 100, 0.2f);
+        Balldetector detector(&filter, 5, 100, 0.3f);
 
         namedWindow("bw");
         namedWindow("output");
@@ -95,7 +92,7 @@ int main (int argc, char** argv)
 
             imshow("output", frame);
 
-            if (cv::waitKey(10) != -1) {
+            if (cv::waitKey(1) != -1) {
                 break;
 
             }
