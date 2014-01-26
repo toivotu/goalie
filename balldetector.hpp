@@ -44,7 +44,7 @@ private:
         int radius;
     } Circle;
 
-    void Recurse(Circle& circle, cv::Mat& image, cv::Mat& orig, Axis axis, int x, int y, int xMax, int yMax);
+    void Recurse(Circle& circle, cv::Mat& image, Axis axis, int x, int y, int xMax, int yMax);
 };
 
 
