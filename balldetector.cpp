@@ -94,8 +94,8 @@ static MyLine Diagonal(cv::Mat& image, cv::Mat& orig, int x, int y)
 }
 }
 
-Balldetector::Balldetector(const IFilter* _filter, int _minDiameter, int _maxDiameter, double _tolerence):
-    filter(_filter)
+Balldetector::Balldetector(const IFilter* _filter, int _minDiameter, int _maxDiameter, double _tolerance, int _step):
+    filter(_filter), tolerance(_tolerance), step(_step)
 {
 
 }
@@ -144,8 +144,8 @@ Balldetector::Ball Balldetector::Detect(cv::Mat& image)
 
     imshow("bw", red);
 
-    for (int i = 0; i < image.cols; i += 5) {
-        for (int j = 0; j < image.rows; j +=5) {
+    for (int i = 0; i < image.cols; i += step) {
+        for (int j = 0; j < image.rows; j += step) {
              if (red.data[i + image.cols * j] == 255u) {
                 image.data[(i + image.cols * j) * 3] = 255;
 

@@ -21,7 +21,7 @@ public:
     } Ball;
 
 
-    Balldetector(const IFilter* filter, int minDiameter, int maxDiameter, double tolerance);
+    Balldetector(const IFilter* filter, int minDiameter, int maxDiameter, double tolerance, int step = 5);
     Ball Detect(cv::Mat& image);
 
     void SetTolerance(double tolerance);
@@ -29,6 +29,7 @@ public:
 private:
     const IFilter* filter;
     double tolerance;
+    int step;
 
     typedef enum {
         AXIS_X,
