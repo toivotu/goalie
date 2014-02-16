@@ -3,6 +3,8 @@ cmake_minimum_required (VERSION 2.8)
 #set (CMAKE_C_COMPILER gcc)
 #set (CMAKE_CXX_COMPILER g++)
 
+SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -pedantic -s -O2 -march=native" )
+
 project (GOALIE) 
 
 include_directories (${GOALIE_SOURCE_DIR}/opencv/include)
