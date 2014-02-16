@@ -34,16 +34,33 @@ private:
 
 };
 
+const int dashTolerance = 5;
+
+bool LineValid(int& count, bool pixelValid)
+{
+    if (pixelValid) {
+        count = dashTolerance;
+    } else {
+        count--;
+    }
+
+    return count > 0;
+}
+
 Line HLine(const IFilter* filter, cv::Mat& image, int x, int y)
 {
     int xMin = x;
     int xMax = x;
 
-    while ((xMin > 1) && filter->IsInRage(&image.data[(xMin - 1 + y * image.cols) * 3])) {
+    int dashCount = dashTolerance;
+
+    while ((xMin > 1) && LineValid(dashCount, filter->IsInRage(&image.data[(xMin - 1 + y * image.cols) * 3]))) {
         xMin--;
     }
 
-    while ((xMax < image.cols - 1) && filter->IsInRage(&image.data[(xMax - 1 + y * image.cols) * 3])) {
+    dashCount = dashTolerance;
+
+    while ((xMax < image.cols - 1) && LineValid(dashCount, filter->IsInRage(&image.data[(xMax - 1 + y * image.cols) * 3]))) {
         xMax++;
     }
 
@@ -55,11 +72,15 @@ Line VLine(const IFilter* filter, cv::Mat& image, int x, int y)
     int yMin = y;
     int yMax = y;
 
-    while ((yMin > 1) && filter->IsInRage(&image.data[(x + yMin * image.cols) * 3])) {
+    int dashCount = dashTolerance;
+
+    while ((yMin > 1) && LineValid(dashCount, filter->IsInRage(&image.data[(x + yMin * image.cols) * 3]))) {
         yMin--;
     }
 
-    while ((yMax < image.rows - 1) && filter->IsInRage(&image.data[(x - 1 + yMax * image.cols) * 3])) {
+    dashCount = dashTolerance;
+
+    while ((yMax < image.rows - 1) && LineValid(dashCount, filter->IsInRage(&image.data[(x - 1 + yMax * image.cols) * 3]))) {
         yMax++;
     }
 
@@ -73,22 +94,26 @@ MyLine Diagonal(const IFilter* filter, cv::Mat& image, int x, int y)
     int yMin = y;
     int yMax = y + 1;
 
-    while ((xMin > 0) && (yMin > 0) && filter->IsInRage(&image.data[(xMin + yMin * image.cols) *3])) {
+    int dashCount = dashTolerance;
+
+    while ((xMin > 0) && (yMin > 0) && LineValid(dashCount, filter->IsInRage(&image.data[(xMin + yMin * image.cols) *3]))) {
         xMin--;
         yMin--;
     }
 
-    while ((xMax < image.cols - 1) && (yMax < image.rows - 1) && filter->IsInRage(&image.data[(xMax + yMax * image.cols) * 3])) {
+    dashCount = dashTolerance;
+
+    while ((xMax < image.cols - 1) && (yMax < image.rows - 1) && LineValid(dashCount, filter->IsInRage(&image.data[(xMax + yMax * image.cols) * 3]))) {
         xMax++;
         yMax++;
     }
 
-    return std::pair<cv::Point, cv::Point>(cv::Point(xMin,yMin),cv::Point(xMax, yMax));
+    return std::pair<cv::Point, cv::Point>(cv::Point(xMin + dashTolerance ,yMin + dashTolerance),cv::Point(xMax - dashTolerance, yMax + dashTolerance));
 }
 }
 
 Balldetector::Balldetector(const IFilter* _filter, int _minDiameter, int _maxDiameter, double _tolerance, int _step):
-    filter(_filter), tolerance(_tolerance), step(_step)
+    filter(_filter), tolerance(_tolerance), step(_step), dashLineStep(15)
 {
 
 }
@@ -138,6 +163,8 @@ Balldetector::Ball Balldetector::Detect(cv::Mat& image)
 
                 detected.radius = 0;
                 Recurse(detected, image, AXIS_X, i, j, 0, 0);
+                detected.xWidth -= 2* dashTolerance;
+                detected.yWidth -= 2* dashTolerance;
 
                 if (abs(1.f - (double)detected.xWidth / (double)detected.yWidth) < tolerance) {
                     detected.radius = (detected.xWidth + detected.yWidth) / 2;

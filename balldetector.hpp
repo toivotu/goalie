@@ -30,6 +30,7 @@ private:
     const IFilter* filter;
     double tolerance;
     int step;
+    int dashLineStep;
 
     typedef enum {
         AXIS_X,
