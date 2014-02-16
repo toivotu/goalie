@@ -91,6 +91,9 @@ int main (int argc, char** argv)
             putText(frame, strs.str(), Point(0,25), FONT_HERSHEY_PLAIN, 1.7, Scalar(0, 255, 0), 2);
 
             imshow("output", frame);
+            cv::Mat filtered = frame;
+            filter.Evaluate(frame, filtered);
+            imshow("bw", filtered);
 
             if (cv::waitKey(1) != -1) {
                 break;
