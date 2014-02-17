@@ -1,0 +1,37 @@
+Source: 
+http://www.linux-projects.org/modules/sections/index.php?op=viewarticle&artid=14
+
+
+To install UV4L open a terminal and type the following commands:
+
+    $ wget http://www.linux-projects.org/listing/uv4l_repo/lrkey.asc && sudo apt-key add ./lrkey.asc
+
+Add the following line to the file /etc/apt/sources.list :
+
+    deb http://www.linux-projects.org/listing/uv4l_repo/raspbian/ wheezy main
+
+    $ sudo apt-get update
+    $ sudo apt-get install uv4l uv4l-raspicam
+
+The last two commands will upgrade UV4L to the most recent version, if it's already installed.
+
+Now the UV4L core component and the Video4Linux2 driver for the CSI Camera Board are installed. If you occasionally get unexpected errors from the driver, consider updating the firmware with the following command:
+
+    $ sudo rpi-update
+
+For detailed informations, options, etc... about the modules installed type accordingly:
+
+    $ man uv4l
+    $ man uv4l-raspicam (the manpage is work in progress)
+
+To get a list of available options:
+
+    $ uv4l --help --driver raspicam --driver-help
+
+To quicly test uv4l, simply run:
+
+    $ uv4l --driver raspicam --auto-video_nr --width 640 --height 480 --encoding jpeg
+
+To take a JPEG snapshot from the Camera:
+
+    $ dd if=/dev/video0 of=snapshot.jpeg bs=11M count=1
