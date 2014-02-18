@@ -1,0 +1,26 @@
+SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -pedantic -s -O2 -march=native" )
+
+include_directories (
+    ${GOALIE_SOURCE_DIR}
+    ${GOALIE_SOURCE_DIR}/win/opencv/include)
+    
+link_directories (${GOALIE_SOURCE_DIR}/win/opencv/lib)
+
+SET (OPENCV-VER 246d)
+
+add_executable (filtertest 
+    ${GOALIE_SOURCE_DIR}/win/filtertest.cpp 
+    balldetector.cpp
+    hsvfilter.cpp
+    rgbfilter.cpp)
+
+target_link_libraries (filtertest 
+    opencv_core${OPENCV-VER}
+    opencv_imgproc${OPENCV-VER}
+    opencv_highgui${OPENCV-VER}
+    opencv_objdetect${OPENCV-VER}
+) 
+
+add_custom_command(TARGET goalie POST_BUILD
+    COMMAND cp ${GOALIE_SOURCE_DIR}/opencv/bin/opencv_ffmpeg246.dll ${EXECUTABLE_OUTPUT_PATH}/opencv_ffmpeg246.dll
+)
