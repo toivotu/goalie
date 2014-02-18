@@ -1,15 +1,17 @@
-cmake_minimum_required (VERSION 2.8) 
-project (BALLTRACE) 
 
-#set (CMAKE_C_COMPILER gcc)
-#set (CMAKE_CXX_COMPILER g++)
 SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -pedantic -s -O2" )
 
+include_directories (
+    ${GOALIE_SOURCE_DIR}
+    ${GOALIE_SOURCE_DIR}/linux
+)
 
-include_directories (${BALLTRACE_SOURCE_DIR})
 link_directories (
     # OpenCV wrapper to rapicam
-    ${BALLTRACE_SOURCE_DIR}/raspicamcv 
+    ${GOALIE_SOURCE_DIR}/linux/raspicamcv 
+    
+    # libwebsock
+    /usr/local/lib
     
     # Raspicam related libs
     /opt/vc/lib/    
@@ -18,15 +20,15 @@ link_directories (
 SET (OPENCV-VER "")
 
 add_executable (follow 
-    ${BALLTRACE_SOURCE_DIR}/follow.cpp
-    ${BALLTRACE_SOURCE_DIR}/hsvfilter.cpp
-    ${BALLTRACE_SOURCE_DIR}/balldetector.cpp
-    ${BALLTRACE_SOURCE_DIR}/serial/serial.cc
-    ${BALLTRACE_SOURCE_DIR}/serial/unix.cc
+    ${GOALIE_SOURCE_DIR}/linux/follow.cpp
+    ${GOALIE_SOURCE_DIR}/linux/serial/serial.cc
+    ${GOALIE_SOURCE_DIR}/linux/serial/unix.cc
+    ${GOALIE_SOURCE_DIR}/hsvfilter.cpp
+    ${GOALIE_SOURCE_DIR}/balldetector.cpp
 )
 
 add_executable (webui
-    ${BALLTRACE_SOURCE_DIR}/webui.cpp
+    ${GOALIE_SOURCE_DIR}/linux/webui.cpp
 )
 
 target_link_libraries (webui
