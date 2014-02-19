@@ -8,15 +8,16 @@
 
 #include "serial/serial.h"
 #include "raspicamcv/RaspiCamCV.h"
+
 #include "balldetector.hpp"
 #include "hsvfilter.hpp"
+#include "median.hpp"
+#include "timer.hpp"
 
 #include <iostream>
 #include <sstream>
-#include <ctime>
 
 #include <ncurses.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <signal.h>
 
@@ -31,55 +32,6 @@ using std::vector;
 using namespace cv;
 
 static bool f_running = true;
-
-class Median {
-public:
-    Median(int _numSamples) : numSamples(_numSamples)
-    {
-
-    }
-
-    float Evaluate(float value)
-    {
-        sum += value;
-        values.push_back(value);
-
-        if (values.size() > numSamples) {
-            sum -= values.front();
-            values.pop_front();
-        }
-
-        return sum / values.size();
-    }
-
-private:
-    std::list<int> values;
-    float sum;
-    int numSamples;
-
-};
-
-class Timer {
-public:
-    void Start()
-    {
-        begin = clock();
-    }
-    
-    void Stop()
-    {
-        end = clock();
-    }
-    
-    double Duration()
-    {
-        return double (end - begin) / CLOCKS_PER_SEC;
-    }
-    
-private:
-    clock_t begin;
-    clock_t end;
-};
 
 static void UpdateAxis(const char* channel, float value, serial::Serial& serialPort)
 {
@@ -113,8 +65,6 @@ static void ResetPosition(serial::Serial& serialPort)
     
 static void Follow(serial::Serial& serialPort, int width, int height, int x, int y)
 {
-    //static float posX = 0;
-    //static float posY = 0;
     const float rate = 0.1f;
     
     float centerX = width / 2;
@@ -134,25 +84,6 @@ static void Follow(serial::Serial& serialPort, int width, int height, int x, int
     
     UpdateAxis("a", posX, serialPort);
     UpdateAxis("b", posY, serialPort);
-}
-
-void HighlightCircles(cv::Mat& src, cv::Mat& result, serial::Serial& port)
-{
-    vector<Vec3f> circles;
-    HoughCircles(src, circles, CV_HOUGH_GRADIENT,
-                 2, src.rows, 100, 50, 10, 75);
-    
-    if (circles.size() > 0) {
-        Point center(cvRound(circles[0][0]), cvRound(circles[0][1]));
-        int radius = cvRound(circles[0][2]);
-        // draw the circle center
-        //circle( src, center, 3, Scalar(0,255,0), -1, 8, 0 );
-        // draw the circle outline
-        circle( result, center, radius, Scalar(255,0,0), 3, 8, 0 );
-        DebugOut("x: " << center.x << " y: " << center.y);
-        Follow(port, src.cols, src.rows, center.x, center.y);
-    }
-    
 }
 
 #define TIMED_BLOCK_START() {Timer _timer; _timer.Start();
@@ -179,63 +110,38 @@ void OpenVideo2()
     DebugOut("Opening video");
 
     if (capture != 0) {
-  /*  
-        int minH = 109;
-        int maxH = 132;
-        int minS = 167;
-        int maxS = 255;
-        int minV = 46;
-        int maxV = 158;
-    */    
-        HsvFilter filter;
+
+    HsvFilter filter;
         filter.SetLimits(cv::Scalar(109,167,46), cv::Scalar(132, 255, 158));
 
         Balldetector detector(&filter, 5, 100, 0.3f);
         
-        
-        //Mat frame;
-      /*  Mat hsv;
-        Mat red;*/
-        int i = 0;
+        int frameCount = 0;
         IplImage* image = raspiCamCvQueryFrame(capture);
-        //bool readOk = video.read(frame); 
         bool readOk = image != 0;
         Mat frame(image);
 
         int timeout = 0;
         while (f_running && readOk) {
-/*
-            TIMED_BLOCK_START();
-            cvtColor(frame, hsv, CV_RGB2HSV);
-            TIMED_BLOCK_END(1, 8);
+            Balldetector::Ball ball;
 
             TIMED_BLOCK_START();
-            inRange(hsv, Scalar(minH,minS,minV), Scalar(maxH, maxS, maxV), red);
-            TIMED_BLOCK_END(2, 9);
-            
-            TIMED_BLOCK_START()
-            GaussianBlur(red, red, Size(9, 9), 2, 2);
-            TIMED_BLOCK_END(3, 14);
-*/          
-            Balldetector::Ball ball;
-            TIMED_BLOCK_START();
-            //HighlightCircles(red, frame, serialPort);
             ball = detector.Detect(frame);
-            TIMED_BLOCK_END(4, 18);
+            TIMED_BLOCK_END(1, 8);
             
             TIMED_BLOCK_START();
-            //readOk = video.read(frame); 
             image = raspiCamCvQueryFrame(capture);
             frame = image;
             TIMED_BLOCK_END(0, 7);
            
             std::stringstream asdf;
-            asdf << i++;
-            mvprintw(6, 12, asdf.str().c_str());
+            asdf << frameCount++;
+            mvprintw(2, 12, asdf.str().c_str());
             refresh();
+            
             if (ball.radius > 0) {
                 Follow(serialPort, frame.cols, frame.rows, ball.x, ball.y);
-                mvprintw(7, 11, "%i,%i      ", ball.x, ball.y);
+                mvprintw(3, 11, "%i,%i      ", ball.x, ball.y);
             } else {
                 timeout++;
                 if (timeout == 50) {
@@ -248,7 +154,7 @@ void OpenVideo2()
         raspiCamCvReleaseCapture(&capture);
         DebugOut("Video finished");
     } else {
-        ("Failed to open video");
+        DebugOut("Failed to open video");
     }
 }
 
@@ -262,13 +168,9 @@ int main (int argc, char** argv)
     signal(SIGINT, HandleSigInt);
     initscr(); 
     mvprintw(0, 0, "Read: ");
-    mvprintw(1, 0, "cvtColor: ");
-    mvprintw(2, 0, "inRange: ");
-    mvprintw(3, 0, "GaussianBlur: ");
-    mvprintw(4, 0, "HighlightCircles: ");
-    mvprintw(5, 0, "Total: ");
-    mvprintw(6, 0, "Frame count: ");
-    mvprintw(7, 0, "Position: ");
+    mvprintw(1, 0, "Detect: ");
+    mvprintw(2, 0, "Frame count: ");
+    mvprintw(3, 0, "Position: ");
     refresh();
     OpenVideo2();
     
