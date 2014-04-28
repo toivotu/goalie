@@ -1,0 +1,106 @@
+/*
+ * ramp.c
+ *
+ *  Created on: Apr 23, 2014
+ *      Author: Mafioso
+ */
+ 
+#include "ramp.h"
+
+#if 1
+#define DEBUG_OUT(x,y)
+#else
+#include <stdio.h>
+#define DEBUG_OUT(x,y) printf(x, y);*/
+#endif
+
+/**
+ * @param state
+ * @param acceleration [steps / s^2]
+ * @param decelration [steps / s^2]
+ * @param maxSpeed [steps / s]
+ */
+void RAMPSetParams(
+    RampState* state,
+    uint32_t acceleration,
+    uint32_t deceleration,
+    uint32_t maxSpeed)
+{
+    /* Ramp steps:
+     *  1/2 * a * t^2
+     *  where t = maxSpeed / a
+     */
+
+    float accelerationTime = (float)maxSpeed / (float)acceleration;
+    float decelerationTime = (float)maxSpeed / (float)deceleration;
+
+    state->accStepCount = 0.5f * acceleration * accelerationTime * accelerationTime;
+    state->decStepCount = 0.5f * deceleration * decelerationTime * decelerationTime;
+    
+    state->maxSpeed = maxSpeed;
+    state->acceleration = acceleration;
+    state->deceleration = deceleration;
+}
+
+static uint32_t DecelerationSpeedAt(const RampState* state, uint32_t distance)
+{
+    return sqrt(distance * 2.f * state->deceleration);
+}
+
+static uint32_t Decelerate(RampState* state)
+{
+    state->speed -= (float)state->deceleration / state->speed;
+    if (state->speed < 0.f) {
+        state->speed = 0.f;
+    }
+}
+
+uint32_t RAMPDecelerate(RampState* state)
+{
+    Decelerate(state);
+    
+    return state->speed;
+}
+
+uint32_t RAMPGetSpeed(RampState* state, uint32_t position, uint32_t targetPosition)
+{
+    uint32_t absDiff = position > targetPosition ? position - targetPosition : targetPosition - position;
+    
+    DEBUG_OUT("%i", DecelerationSpeedAt(state, absDiff));
+    
+    if (absDiff <= state->decStepCount && state->speed > DecelerationSpeedAt(state, absDiff)) {
+    
+        /* Decelerating */
+        DEBUG_OUT("%s", "declerating ");
+        Decelerate(state);
+        
+    } else if (state->speed < state->maxSpeed) {
+    
+        /* Accelerating */
+        DEBUG_OUT("%s", "accelerating ");
+        if (state->speed > 0) {
+            state->speed += (float)state->acceleration / state->speed;
+        } else {
+            state->speed = 10;
+        }
+            
+        if (state->maxSpeed > state->maxSpeed) {
+            state->maxSpeed = state->maxSpeed;
+        }
+        
+    } else if (absDiff == 0) {
+    
+        /* Stopped */
+        DEBUG_OUT("%s", "stopped ");
+        state->speed = 0.f;
+        
+    } else {
+    
+        /* Running at max speed */
+        DEBUG_OUT("%s", "maxSpeed ");
+        state->maxSpeed = state->maxSpeed;
+        
+    }
+        
+    return state->speed;
+}
