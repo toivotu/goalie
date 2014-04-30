@@ -12,8 +12,10 @@
 
 extern void UARTInit(void);
 
-extern void UARTSendByte(char dataByte);
+extern void UARTSendChar(char dataByte);
 extern void UARTSend(const char* data, uint8_t dataCount);
+
+extern void UARTSendString_P(const char* str);
 extern void UARTSendString(const char* str);
 
 extern uint8_t UARTRead(void);
