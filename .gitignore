@@ -12,3 +12,6 @@
 *.la
 
 build/*
+avr/.cproject
+avr/.project
+avr/build/*
