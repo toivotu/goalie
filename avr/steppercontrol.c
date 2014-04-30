@@ -7,11 +7,15 @@
 
 #include <avr/io.h>
 #include <avr/sleep.h>
+#include <avr/pgmspace.h>
 #include <util/delay.h>
 
-//#include <math.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "uart.h"
+#include "ramp.h"
 
 #define DDR_EN      DDRC
 #define PORT_EN     PORTC
@@ -35,7 +39,7 @@ void Init(void)
     DDR_CW |= (1 << PIN_CW);
     DDR_CLK |= (1 << PIN_CLK);
 
-    // Ground potentiometer side
+    /* Ground potentiometer side */
     DDRC |= 1 << PC4;
     PORTC &=  ~(1 << PC4);
 
@@ -65,10 +69,11 @@ static void StandardDelay(void)
     _delay_ms(10);
 }
 
+/*
 static double GetDelay(uint32_t currentPosition, uint32_t targetPosition)
 {
     return 10000.f;
-}
+}*/
 
 static void Clock(void)
 {
@@ -146,30 +151,80 @@ void SynchronizedDelay(uint32_t delay_us)
     prevCounter = TCNT1;
 }
 
+/* Progmem data must be declared globally */
+char hello[] PROGMEM = "Stepper controller for raspi goalie\r";
 
 int main(void)
 {
-    Init();
-
-    _delay_ms(1000);
-
-    uint32_t maxPosition = FindMaxPosition();
+    uint32_t maxPosition;
     uint32_t position = 0;
     uint32_t targetPosition = 0;
-
-    PORT_EN &= ~(1 << PIN_EN);
-
     float normalizedTarget = 0.f;
 
+    char buffer[32];
+    uint8_t bufferPos = 0;
 
+    RampState ramp;
+    RAMPSetParams(&ramp, 400, 600, 1000);
+
+    Init();
+    _delay_ms(1000);
+    PORT_EN &= ~(1 << PIN_EN);
+
+    UARTSendString_P(hello);
+
+    maxPosition = 25000; //FindMaxPosition();
     targetPosition = GetTargetPosition(normalizedTarget, maxPosition);
 
     while (1)
     {
+        /*
         if (position != targetPosition) {
             Direction dir = GetDirection(position, targetPosition);
-            SynchronizedDelay(GetDelay(position, targetPosition));
+            SynchronizedDelay(1000000u / RAMPGetSpeed(&ramp, position, targetPosition));
             position = Step(dir);
+        }*/
+
+        if (UARTDataReady()) {
+            buffer[bufferPos] = UARTRead();
+            UARTSendChar(buffer[bufferPos]);
+
+           if (buffer[bufferPos] == '\r') {
+
+                float pos;
+                buffer[bufferPos] = 0;
+                //pos = atof(buffer);
+                sscanf(buffer, "%f", pos);
+
+                if (pos > 1.f) {
+                    pos = 1.f;
+                } else if (pos < -1.f) {
+                    pos = -1.f;
+                }
+
+                targetPosition = GetTargetPosition(pos, maxPosition);
+                bufferPos = 0;
+
+                char buffer2[32];
+                sprintf(buffer2, "Position: %i\r", (int)targetPosition);
+                //const char* posStr = "Position: ";
+                /*UARTSendChar('P');_delay_ms(100);
+                UARTSendChar('o');_delay_ms(100);
+                UARTSendChar('s');_delay_ms(100);
+                UARTSendChar('i');_delay_ms(100);
+                UARTSendChar('t');_delay_ms(100);
+                UARTSendChar('i');_delay_ms(100);
+                UARTSendChar('o');_delay_ms(100);
+                UARTSendChar('n');_delay_ms(100);
+                UARTSendChar(':');_delay_ms(100);
+                UARTSendChar(' ');_delay_ms(100);*/
+                //UARTSendString("Position: ");
+                UARTSendString(buffer2);
+
+            } else if (bufferPos < 31) {
+                ++bufferPos;
+            }
         }
     }
 }
+
