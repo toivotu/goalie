@@ -27,108 +27,16 @@
 #define PORT_CLK    PORTC
 #define PIN_CLK     PC3
 
+#define DDR_SW_R    DDRC
+#define PORT_SW_R   PORTC
+#define INPORT_SW_R PINC
+#define PIN_SW_R    PC4
 
-void Init(void)
-{
-    DDR_EN |= (1 << PIN_EN);
-    DDR_CW |= (1 << PIN_CW);
-    DDR_CLK |= (1 << PIN_CLK);
+#define DDR_SW_L    DDRC
+#define PORT_SW_L   PORTC
+#define INPORT_SW_L PINC
+#define PIN_SW_L    PC5
 
-    /* Ground potentiometer side */
-    DDRC |= 1 << PC4;
-    PORTC &=  ~(1 << PC4);
-
-    UARTInit();
-}
-
-typedef enum {
-    DIR_RIGHT,
-    DIR_LEFT
-} Direction;
-
-static bool_t AtRightEnd(void)
-{
-    /* TODO */
-
-    return false;
-}
-
-static bool_t AtLeftEnd(void)
-{
-    /* TODO */
-    return false;
-}
-
-static void StandardDelay(void)
-{
-    _delay_ms(10);
-}
-
-/*
-static double GetDelay(uint32_t currentPosition, uint32_t targetPosition)
-{
-    return 10000.f;
-}*/
-
-static void Clock(void)
-{
-    /* Clock out, 30us minimum as per TB6560 specs */
-    PORT_CLK |= (1 << PIN_CLK);
-    _delay_us(30);
-    PORT_CLK &= ~(1 << PIN_CLK);
-}
-
-static int8_t Step(Direction dir)
-{
-    uint8_t step = 0;
-
-    if (dir == DIR_RIGHT && !AtRightEnd()) {
-        step = -1;
-        PORT_CW &= ~(1 << PIN_CW);
-        Clock();
-    } else if (dir == DIR_LEFT && !AtLeftEnd()) {
-        step = 1;
-        PORT_CW |= (1 << PIN_CW);
-        Clock();
-    }
-
-    return step;
-}
-
-void Update(void)
-{
-
-}
-
-static uint32_t FindMaxPosition(void)
-{
-    uint32_t maxPosition = 0;
-
-    while (!AtRightEnd()) {
-        Step(DIR_RIGHT);
-        StandardDelay();
-    }
-
-    while (!AtRightEnd()) {
-        Step(DIR_LEFT);
-        StandardDelay();
-        ++maxPosition;
-    }
-
-    return maxPosition;
-}
-
-static Direction GetDirection(uint32_t position, uint32_t target)
-{
-    return position < target ? DIR_LEFT : DIR_RIGHT;
-}
-
-static uint32_t GetTargetPosition(float target, uint32_t maxPosition)
-{
-    uint32_t center = maxPosition / 2;
-
-    return center + center * target;
-}
 
 void InitTimer(void)
 {
@@ -155,6 +63,80 @@ void SynchronizedDelay(uint32_t delay_us)
     prevCounter = TCNT1;
 }
 
+
+typedef enum {
+    DIR_RIGHT,
+    DIR_LEFT
+} Direction;
+
+static bool_t AtRightEnd(void)
+{
+    return (INPORT_SW_R & (1 << PIN_SW_R)) != 0;
+}
+
+static bool_t AtLeftEnd(void)
+{
+    return (INPORT_SW_L & (1 << PIN_SW_L)) != 0;
+}
+
+static void StandardDelay(void)
+{
+    _delay_ms(10);
+}
+
+static void Clock(void)
+{
+    /* Clock out, 30us minimum as per TB6560 specs */
+    PORT_CLK |= (1 << PIN_CLK);
+    _delay_us(30);
+    PORT_CLK &= ~(1 << PIN_CLK);
+}
+
+static int8_t Step(Direction dir)
+{
+    uint8_t step = 0;
+
+    if (dir == DIR_RIGHT && !AtRightEnd()) {
+        step = 1;
+        PORT_CW &= ~(1 << PIN_CW);
+        Clock();
+    } else if (dir == DIR_LEFT && !AtLeftEnd()) {
+        step = -1;
+        PORT_CW |= (1 << PIN_CW);
+        Clock();
+    }
+
+    return step;
+}
+
+static uint32_t FindMaxPosition(void)
+{
+    uint32_t maxPosition = 0;
+
+    while (Step(DIR_LEFT) != 0) {
+        StandardDelay();
+    }
+
+    while (Step(DIR_RIGHT) != 0) {
+        StandardDelay();
+        ++maxPosition;
+    }
+
+    return maxPosition;
+}
+
+static Direction GetDirection(uint32_t position, uint32_t target)
+{
+    return position > target ? DIR_LEFT : DIR_RIGHT;
+}
+
+static uint32_t GetTargetPosition(float target, uint32_t maxPosition)
+{
+    uint32_t center = maxPosition / 2;
+
+    return center + center * target;
+}
+
 /* Progmem data must be declared globally */
 char helloString[] PROGMEM = "Stepper controller for raspi goalie!\r";
 
@@ -172,6 +154,34 @@ void PrintPosition(uint32_t position)
     UARTSendChar('\r');
 }
 
+typedef enum {
+    ENABLE_INACTIVE,
+    ENABLE_ACTIVE
+} EnableStatus;
+
+void ControlEnable(EnableStatus status)
+{
+    if (status == ENABLE_ACTIVE) {
+        PORT_EN &= ~(1 << PIN_EN);
+    } else {
+        PORT_EN |= (1 << PIN_EN);
+    }
+}
+
+void Init(void)
+{
+    DDR_EN |= (1 << PIN_EN);
+    DDR_CW |= (1 << PIN_CW);
+    DDR_CLK |= (1 << PIN_CLK);
+
+    /* Pull-ups */
+    PORT_SW_R |= (1 << PIN_SW_R);
+    PORT_SW_L |= (1 << PIN_SW_L);
+
+    UARTInit();
+    InitTimer();
+}
+
 int main(void)
 {
     uint32_t maxPosition;
@@ -186,13 +196,17 @@ int main(void)
     RAMPSetParams(&ramp, 400, 600, 50, 1000);
 
     Init();
-    InitTimer();
     _delay_ms(1000);
-    PORT_EN &= ~(1 << PIN_EN);
 
     UARTSendString_P(helloString);
 
-    maxPosition = 2500; //FindMaxPosition();
+    ControlEnable(ENABLE_ACTIVE);
+
+    /* 5 steps of slack to each end */
+    maxPosition = FindMaxPosition();
+    position = maxPosition + 5;
+    maxPosition -= 10;
+
     targetPosition = GetTargetPosition(normalizedTarget, maxPosition);
 
     while (1)
@@ -200,7 +214,11 @@ int main(void)
         if (position != targetPosition) {
             Direction dir = GetDirection(position, targetPosition);
             SynchronizedDelay(1000000u / RAMPGetSpeed(&ramp, position, targetPosition));
+            ControlEnable(ENABLE_ACTIVE);
             position += Step(dir);
+        } else {
+            /* No hold current to decrease power consumption */
+            ControlEnable(ENABLE_INACTIVE);
         }
 
         if (UARTDataReady()) {
