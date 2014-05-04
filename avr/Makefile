@@ -1,10 +1,12 @@
+target = goalie
+BUILD_DIR = build
+
 CC = avr-gcc.exe
 OBJCOPY = avr-objcopy.exe
 CFLAGS = -O2 -mmcu=atmega328p -Wall -pedantic -DF_CPU=16000000
-LINKER_FLAGS = -lm -lprintf_flt -lscanf_flt
-BUILD_DIR = build
+LINKER_FLAGS = -lm -Wl,-Map=$(BUILD_DIR)/$(target).map
 
-target = goalie
+
 
 sources = \
   adc.c \
@@ -28,7 +30,7 @@ $(BUILD_DIR)/$(target).hex: $(BUILD_DIR)/$(target).elf
 	avr-size $@
 	
 $(BUILD_DIR)/$(target).elf : $(objects)
-	$(CC) $^ $(LINKER_FLAGS) -o $@
+	$(CC) $^ $(CFLAGS) $(LINKER_FLAGS) -o $@
 
 $(BUILD_DIR)/%.o: %.c
 	$(CC) $< -c $(CFLAGS) -o $@

@@ -18,12 +18,14 @@
  * @param state
  * @param acceleration [steps / s^2]
  * @param decelration [steps / s^2]
+ * @param minSpeed [steps / s]
  * @param maxSpeed [steps / s]
  */
 void RAMPSetParams(
     RampState* state,
     uint32_t acceleration,
     uint32_t deceleration,
+    uint32_t minSpeed,
     uint32_t maxSpeed)
 {
     /* Ramp steps:
@@ -37,6 +39,7 @@ void RAMPSetParams(
     state->accStepCount = 0.5f * acceleration * accelerationTime * accelerationTime;
     state->decStepCount = 0.5f * deceleration * decelerationTime * decelerationTime;
     
+    state->minSpeed = minSpeed;
     state->maxSpeed = maxSpeed;
     state->acceleration = acceleration;
     state->deceleration = deceleration;
@@ -50,8 +53,11 @@ static uint32_t DecelerationSpeedAt(const RampState* state, uint32_t distance)
 static void Decelerate(RampState* state)
 {
     state->speed -= (float)state->deceleration / state->speed;
+
     if (state->speed < 0.f) {
         state->speed = 0.f;
+    } else if (state->speed < state->minSpeed) {
+        state->speed = state->minSpeed;
     }
 }
 
@@ -87,19 +93,18 @@ uint32_t RAMPGetSpeed(RampState* state, uint32_t position, uint32_t targetPositi
         if (state->speed > 0) {
             state->speed += (float)state->acceleration / state->speed;
         } else {
-            state->speed = 10;
+            state->speed = state->minSpeed;
         }
             
         if (state->maxSpeed > state->maxSpeed) {
-            state->maxSpeed = state->maxSpeed;
+            state->speed = state->maxSpeed;
         }
         
     }  else {
     
         /* Running at max speed */
         DEBUG_OUT("%s", "maxSpeed ");
-        state->maxSpeed = state->maxSpeed;
-        
+        state->speed = state->maxSpeed;
     }
         
     return state->speed;

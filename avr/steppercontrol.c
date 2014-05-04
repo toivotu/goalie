@@ -10,8 +10,6 @@
 #include <avr/pgmspace.h>
 #include <util/delay.h>
 
-#include <string.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "uart.h"
@@ -29,9 +27,6 @@
 #define PORT_CLK    PORTC
 #define PIN_CLK     PC3
 
-
-
-#define DEAD_ZONE 10
 
 void Init(void)
 {
@@ -55,13 +50,13 @@ static bool_t AtRightEnd(void)
 {
     /* TODO */
 
-    return true;
+    return false;
 }
 
 static bool_t AtLeftEnd(void)
 {
     /* TODO */
-    return true;
+    return false;
 }
 
 static void StandardDelay(void)
@@ -141,18 +136,41 @@ void InitTimer(void)
     TCCR1B = (1 << CS11) | (1 << CS10);
 }
 
-/* Delay from last return of this function */
+/* Synchronized delay
+ *
+ * @param Delay from last return of this function
+ */
 void SynchronizedDelay(uint32_t delay_us)
 {
-    static uint16_t prevCounter = 0;
+    static volatile uint16_t prevCounter = 0;
 
-    while ((TCNT1 - prevCounter) < delay_us / 4);
+    delay_us /= 4;
+
+    if (delay_us > 65500) {
+        delay_us = 65500;
+    }
+
+    while (TCNT1 - prevCounter < delay_us) {}
 
     prevCounter = TCNT1;
 }
 
 /* Progmem data must be declared globally */
-char hello[] PROGMEM = "Stepper controller for raspi goalie\r";
+char helloString[] PROGMEM = "Stepper controller for raspi goalie!\r";
+
+void PrintPosition(uint32_t position)
+{
+    char buffer [12];
+    uint8_t pos = 12;
+
+    do {
+        buffer[--pos] = position % 10 + '0';
+        position /= 10;
+    } while (position > 0);
+
+    UARTSend(&buffer[pos], 12 - pos);
+    UARTSendChar('\r');
+}
 
 int main(void)
 {
@@ -165,25 +183,25 @@ int main(void)
     uint8_t bufferPos = 0;
 
     RampState ramp;
-    RAMPSetParams(&ramp, 400, 600, 1000);
+    RAMPSetParams(&ramp, 400, 600, 50, 1000);
 
     Init();
+    InitTimer();
     _delay_ms(1000);
     PORT_EN &= ~(1 << PIN_EN);
 
-    UARTSendString_P(hello);
+    UARTSendString_P(helloString);
 
-    maxPosition = 25000; //FindMaxPosition();
+    maxPosition = 2500; //FindMaxPosition();
     targetPosition = GetTargetPosition(normalizedTarget, maxPosition);
 
     while (1)
     {
-        /*
         if (position != targetPosition) {
             Direction dir = GetDirection(position, targetPosition);
             SynchronizedDelay(1000000u / RAMPGetSpeed(&ramp, position, targetPosition));
-            position = Step(dir);
-        }*/
+            position += Step(dir);
+        }
 
         if (UARTDataReady()) {
             buffer[bufferPos] = UARTRead();
@@ -193,8 +211,7 @@ int main(void)
 
                 float pos;
                 buffer[bufferPos] = 0;
-                //pos = atof(buffer);
-                sscanf(buffer, "%f", pos);
+                pos = atof(buffer);
 
                 if (pos > 1.f) {
                     pos = 1.f;
@@ -205,21 +222,7 @@ int main(void)
                 targetPosition = GetTargetPosition(pos, maxPosition);
                 bufferPos = 0;
 
-                char buffer2[32];
-                sprintf(buffer2, "Position: %i\r", (int)targetPosition);
-                //const char* posStr = "Position: ";
-                /*UARTSendChar('P');_delay_ms(100);
-                UARTSendChar('o');_delay_ms(100);
-                UARTSendChar('s');_delay_ms(100);
-                UARTSendChar('i');_delay_ms(100);
-                UARTSendChar('t');_delay_ms(100);
-                UARTSendChar('i');_delay_ms(100);
-                UARTSendChar('o');_delay_ms(100);
-                UARTSendChar('n');_delay_ms(100);
-                UARTSendChar(':');_delay_ms(100);
-                UARTSendChar(' ');_delay_ms(100);*/
-                //UARTSendString("Position: ");
-                UARTSendString(buffer2);
+                PrintPosition(targetPosition);
 
             } else if (bufferPos < 31) {
                 ++bufferPos;
