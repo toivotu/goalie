@@ -37,6 +37,19 @@
 #define INPORT_SW_L PINC
 #define PIN_SW_L    PC5
 
+typedef enum {
+    ENABLE_INACTIVE,
+    ENABLE_ACTIVE
+} EnableStatus;
+
+typedef enum {
+    DIR_RIGHT,
+    DIR_LEFT
+} Direction;
+
+/* Progmem data must be declared globally */
+char helloString[] PROGMEM = "Stepper controller for raspi goalie!\r";
+
 
 void InitTimer(void)
 {
@@ -62,12 +75,6 @@ void SynchronizedDelay(uint32_t delay_us)
 
     prevCounter = TCNT1;
 }
-
-
-typedef enum {
-    DIR_RIGHT,
-    DIR_LEFT
-} Direction;
 
 static bool_t AtRightEnd(void)
 {
@@ -137,9 +144,6 @@ static uint32_t GetTargetPosition(float target, uint32_t maxPosition)
     return center + center * target;
 }
 
-/* Progmem data must be declared globally */
-char helloString[] PROGMEM = "Stepper controller for raspi goalie!\r";
-
 void PrintPosition(uint32_t position)
 {
     char buffer [12];
@@ -153,11 +157,6 @@ void PrintPosition(uint32_t position)
     UARTSend(&buffer[pos], 12 - pos);
     UARTSendChar('\r');
 }
-
-typedef enum {
-    ENABLE_INACTIVE,
-    ENABLE_ACTIVE
-} EnableStatus;
 
 void ControlEnable(EnableStatus status)
 {
@@ -205,7 +204,7 @@ int main(void)
     /* 5 steps of slack to each end */
     maxPosition = FindMaxPosition();
     position = maxPosition + 5;
-    maxPosition -= 10;
+    maxPosition = maxPosition > 10 ? maxPosition - 10 : maxPosition;
 
     targetPosition = GetTargetPosition(normalizedTarget, maxPosition);
 
