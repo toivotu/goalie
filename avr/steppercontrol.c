@@ -49,6 +49,10 @@ typedef enum {
 
 /* Progmem data must be declared globally */
 char helloString[] PROGMEM = "Stepper controller for raspi goalie!\r";
+char posStr[] PROGMEM = "Position ";
+char accStr[] PROGMEM = "Acceleration ";
+char decStr[] PROGMEM = "Deceleration ";
+char spdStr[] PROGMEM = "Max speed ";
 
 
 void InitTimer(void)
@@ -144,7 +148,7 @@ static uint32_t GetTargetPosition(float target, uint32_t maxPosition)
     return center + center * target;
 }
 
-void PrintPosition(uint32_t position)
+void PrintValue(uint32_t position)
 {
     char buffer [12];
     uint8_t pos = 12;
@@ -181,15 +185,81 @@ void Init(void)
     InitTimer();
 }
 
+
+uint32_t UpdatePosition(uint32_t position, uint32_t targetPosition, RampState* ramp)
+{
+    if (position != targetPosition) {
+        Direction dir = GetDirection(position, targetPosition);
+        SynchronizedDelay(1000000u / RAMPGetSpeed(ramp, position, targetPosition));
+        ControlEnable(ENABLE_ACTIVE);
+        position += Step(dir);
+    } else {
+        /* No hold current to decrease power consumption */
+        ControlEnable(ENABLE_INACTIVE);
+    }
+
+    return position;
+}
+
+typedef struct {
+    enum {
+        COMMAND_POSITION,
+        COMMAND_ACCELERATION,
+        COMMAND_DECELERATION,
+        COMMAND_MAX_SPEED,
+        COMMAND_NONE
+    } command;
+    float arg;
+} Command;
+
+bool_t CommandReady(Command* command)
+{
+    static char buffer[32];
+    static uint8_t bufferPos = 0;
+
+    command->command = COMMAND_NONE;
+
+    if (UARTDataReady()) {
+        buffer[bufferPos] = UARTRead();
+        UARTSendChar(buffer[bufferPos]);
+
+       if (buffer[bufferPos] == '\r') {
+
+           if (buffer[0] == 'p') {
+               command->command = COMMAND_POSITION;
+           } else if (buffer[0] == 'a') {
+               command->command = COMMAND_ACCELERATION;
+           } else if (buffer[0] == 'd') {
+               command->command = COMMAND_DECELERATION;
+           } else if (buffer[0] == 'm') {
+               command->command = COMMAND_MAX_SPEED;
+           }
+
+           buffer[bufferPos] = 0;
+           command->arg = atof(&buffer[1]);
+
+           bufferPos = 0;
+
+        } else if (bufferPos < 31) {
+            ++bufferPos;
+        }
+    }
+
+    return command->command != COMMAND_NONE;
+}
+
+float LimitValue(float value, float min, float max)
+{
+    return value < min ? min :
+            value > max ? max :
+                value;
+}
+
 int main(void)
 {
     uint32_t maxPosition;
     uint32_t position = 0;
     uint32_t targetPosition = 0;
-    float normalizedTarget = 0.f;
-
-    char buffer[32];
-    uint8_t bufferPos = 0;
 
     RampState ramp;
     RAMPSetParams(&ramp, 400, 600, 50, 1000);
@@ -206,45 +276,49 @@ int main(void)
     position = maxPosition + 5;
     maxPosition = maxPosition > 10 ? maxPosition - 10 : maxPosition;
 
-    targetPosition = GetTargetPosition(normalizedTarget, maxPosition);
+    targetPosition = GetTargetPosition(0.f, maxPosition);
 
     while (1)
     {
-        if (position != targetPosition) {
-            Direction dir = GetDirection(position, targetPosition);
-            SynchronizedDelay(1000000u / RAMPGetSpeed(&ramp, position, targetPosition));
-            ControlEnable(ENABLE_ACTIVE);
-            position += Step(dir);
-        } else {
-            /* No hold current to decrease power consumption */
-            ControlEnable(ENABLE_INACTIVE);
-        }
+        Command command;
+        position = UpdatePosition(position, targetPosition, &ramp);
 
-        if (UARTDataReady()) {
-            buffer[bufferPos] = UARTRead();
-            UARTSendChar(buffer[bufferPos]);
+        if (CommandReady(&command)) {
+            switch (command.command)
+            {
+            case COMMAND_POSITION:
+                command.arg = LimitValue(command.arg, -1.f, 1.f);
+                targetPosition = GetTargetPosition(command.arg, maxPosition);
+                UARTSendString_P(posStr);
+                PrintValue(targetPosition);
+                break;
 
-           if (buffer[bufferPos] == '\r') {
+            case COMMAND_ACCELERATION:
+                command.arg = LimitValue(command.arg, 0, 1000);
+                RAMPSetAcceleration(&ramp, command.arg);
+                UARTSendString_P(accStr);
+                PrintValue(command.arg);
+                break;
 
-                float pos;
-                buffer[bufferPos] = 0;
-                pos = atof(buffer);
+            case COMMAND_DECELERATION:
+                command.arg = LimitValue(command.arg, 0, 1000);
+                RAMPSetDeceleration(&ramp, command.arg);
+                UARTSendString_P(decStr);
+                PrintValue(command.arg);
+                break;
 
-                if (pos > 1.f) {
-                    pos = 1.f;
-                } else if (pos < -1.f) {
-                    pos = -1.f;
-                }
+            case COMMAND_MAX_SPEED:
+                command.arg = LimitValue(command.arg, 0, 5000);
+                RAMPSetMaxSpeed(&ramp, command.arg);
+                UARTSendString_P(spdStr);
+                PrintValue(command.arg);
+                break;
 
-                targetPosition = GetTargetPosition(pos, maxPosition);
-                bufferPos = 0;
-
-                PrintPosition(targetPosition);
-
-            } else if (bufferPos < 31) {
-                ++bufferPos;
+            default:
+                break;
             }
         }
+
     }
 }
 

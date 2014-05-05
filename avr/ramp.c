@@ -45,6 +45,21 @@ void RAMPSetParams(
     state->deceleration = deceleration;
 }
 
+void RAMPSetAcceleration(RampState* state, float acceleration)
+{
+    RAMPSetParams(state, acceleration, state->deceleration, state->minSpeed, state->maxSpeed);
+}
+
+void RAMPSetDeceleration(RampState* state, float deceleration)
+{
+    RAMPSetParams(state, state->acceleration, deceleration, state->minSpeed, state->maxSpeed);
+}
+
+void RAMPSetMaxSpeed(RampState* state, float maxSpeed)
+{
+    RAMPSetParams(state, state->acceleration, state->deceleration, state->minSpeed, maxSpeed);
+}
+
 static uint32_t DecelerationSpeedAt(const RampState* state, uint32_t distance)
 {
     return sqrt(distance * 2.f * state->deceleration);

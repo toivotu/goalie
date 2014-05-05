@@ -21,6 +21,10 @@ typedef struct {
     float maxSpeed;
 } RampState;
 
+extern void RAMPSetAcceleration(RampState* state, float acceleration);
+extern void RAMPSetDeceleration(RampState* state, float deceleration);
+extern void RAMPSetMaxSpeed(RampState* state, float maxSpeed);
+
 extern void RAMPSetParams(
     RampState* state,
     uint32_t acceleration,
