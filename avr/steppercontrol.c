@@ -14,6 +14,9 @@
 
 #include "uart.h"
 #include "ramp.h"
+#include "types.h"
+
+#define ABS(x) (x > 0 ? x : -x)
 
 #define DDR_EN      DDRC
 #define PORT_EN     PORTC
@@ -44,7 +47,8 @@ typedef enum {
 
 typedef enum {
     DIR_RIGHT,
-    DIR_LEFT
+    DIR_LEFT,
+    DIR_NONE
 } Direction;
 
 /* Progmem data must be declared globally */
@@ -52,7 +56,8 @@ char helloString[] PROGMEM = "Stepper controller for raspi goalie!\r";
 char posStr[] PROGMEM = "Position ";
 char accStr[] PROGMEM = "Acceleration ";
 char decStr[] PROGMEM = "Deceleration ";
-char spdStr[] PROGMEM = "Max speed ";
+char maxStr[] PROGMEM = "Max speed ";
+char spdStr[] PROGMEM = "Speed ";
 
 
 void InitTimer(void)
@@ -127,7 +132,7 @@ static uint32_t FindMaxPosition(void)
     while (Step(DIR_LEFT) != 0) {
         StandardDelay();
     }
-
+    _delay_ms(500);
     while (Step(DIR_RIGHT) != 0) {
         StandardDelay();
         ++maxPosition;
@@ -136,9 +141,9 @@ static uint32_t FindMaxPosition(void)
     return maxPosition;
 }
 
-static Direction GetDirection(uint32_t position, uint32_t target)
+static Direction GetDirection(int32_t speed)
 {
-    return position > target ? DIR_LEFT : DIR_RIGHT;
+    return speed > 0 ? DIR_RIGHT : DIR_LEFT;
 }
 
 static uint32_t GetTargetPosition(float target, uint32_t maxPosition)
@@ -148,21 +153,26 @@ static uint32_t GetTargetPosition(float target, uint32_t maxPosition)
     return center + center * target;
 }
 
-void PrintValue(uint32_t position)
+void PrintValue(int32_t position)
 {
     char buffer [12];
     uint8_t pos = 12;
+
+    if (position < 0) {
+        UARTSendChar('-');
+    }
 
     do {
         buffer[--pos] = position % 10 + '0';
         position /= 10;
     } while (position > 0);
 
+
     UARTSend(&buffer[pos], 12 - pos);
     UARTSendChar('\r');
 }
 
-void ControlEnable(EnableStatus status)
+void SetEnableState(EnableStatus status)
 {
     if (status == ENABLE_ACTIVE) {
         PORT_EN &= ~(1 << PIN_EN);
@@ -185,17 +195,18 @@ void Init(void)
     InitTimer();
 }
 
-
 uint32_t UpdatePosition(uint32_t position, uint32_t targetPosition, RampState* ramp)
 {
     if (position != targetPosition) {
-        Direction dir = GetDirection(position, targetPosition);
-        SynchronizedDelay(1000000u / RAMPGetSpeed(ramp, position, targetPosition));
-        ControlEnable(ENABLE_ACTIVE);
+        int32_t speed = RAMPGetSpeed(ramp, position, targetPosition);
+        Direction dir = GetDirection(speed);
+        SynchronizedDelay(1000000u / ABS(speed));
+
+        SetEnableState(ENABLE_ACTIVE);
         position += Step(dir);
     } else {
         /* No hold current to decrease power consumption */
-        ControlEnable(ENABLE_INACTIVE);
+        SetEnableState(ENABLE_INACTIVE);
     }
 
     return position;
@@ -207,6 +218,11 @@ typedef struct {
         COMMAND_ACCELERATION,
         COMMAND_DECELERATION,
         COMMAND_MAX_SPEED,
+        COMMAND_GET_POSITION,
+        COMMAND_GET_ACCELERATION,
+        COMMAND_GET_DECELERATION,
+        COMMAND_GET_MAX_SPEED,
+        COMMAND_GET_SPEED,
         COMMAND_NONE
     } command;
     float arg;
@@ -226,14 +242,36 @@ bool_t CommandReady(Command* command)
        if (buffer[bufferPos] == '\r') {
 
            if (buffer[0] == 'p') {
-               command->command = COMMAND_POSITION;
+               if (buffer[1] == '?') {
+                   command->command = COMMAND_GET_POSITION;
+               } else {
+                   command->command = COMMAND_POSITION;
+               }
            } else if (buffer[0] == 'a') {
-               command->command = COMMAND_ACCELERATION;
+               if (buffer[1] == '?') {
+                   command->command = COMMAND_GET_ACCELERATION;
+               } else {
+                   command->command = COMMAND_ACCELERATION;
+               }
            } else if (buffer[0] == 'd') {
-               command->command = COMMAND_DECELERATION;
+               if (buffer[1] == '?') {
+                   command->command = COMMAND_GET_DECELERATION;
+               } else {
+                   command->command = COMMAND_DECELERATION;
+               }
            } else if (buffer[0] == 'm') {
-               command->command = COMMAND_MAX_SPEED;
+               if (buffer[1] == '?') {
+                   command->command = COMMAND_GET_MAX_SPEED;
+               } else {
+                   command->command = COMMAND_MAX_SPEED;
+               }
            }
+
+           else if (buffer[0] == 's') {
+              if (buffer[1] == '?') {
+                  command->command = COMMAND_GET_SPEED;
+              }
+          }
 
            buffer[bufferPos] = 0;
            command->arg = atof(&buffer[1]);
@@ -263,13 +301,13 @@ int main(void)
 
     RampState ramp;
     RAMPSetParams(&ramp, 400, 600, 50, 1000);
+    RAMPInit(&ramp);
 
     Init();
-    _delay_ms(1000);
 
     UARTSendString_P(helloString);
 
-    ControlEnable(ENABLE_ACTIVE);
+    SetEnableState(ENABLE_ACTIVE);
 
     /* 5 steps of slack to each end */
     maxPosition = FindMaxPosition();
@@ -310,8 +348,33 @@ int main(void)
             case COMMAND_MAX_SPEED:
                 command.arg = LimitValue(command.arg, 0, 5000);
                 RAMPSetMaxSpeed(&ramp, command.arg);
-                UARTSendString_P(spdStr);
+                UARTSendString_P(maxStr);
                 PrintValue(command.arg);
+                break;
+
+            case COMMAND_GET_POSITION:
+                UARTSendString_P(posStr);
+                PrintValue(position);
+                break;
+
+            case COMMAND_GET_ACCELERATION:
+                UARTSendString_P(accStr);
+                PrintValue(ramp.acceleration);
+                break;
+
+            case COMMAND_GET_DECELERATION:
+                UARTSendString_P(decStr);
+                PrintValue(ramp.deceleration);
+                break;
+
+            case COMMAND_GET_MAX_SPEED:
+                UARTSendString_P(maxStr);
+                PrintValue(ramp.maxSpeed);
+                break;
+
+            case COMMAND_GET_SPEED:
+                UARTSendString_P(spdStr);
+                PrintValue(ramp.speed);
                 break;
 
             default:

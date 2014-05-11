@@ -11,7 +11,7 @@
 #define DEBUG_OUT(x,y)
 #else
 #include <stdio.h>
-#define DEBUG_OUT(x,y) printf(x, y);*/
+#define DEBUG_OUT(x,y) printf(x, y);
 #endif
 
 /**
@@ -45,6 +45,11 @@ void RAMPSetParams(
     state->deceleration = deceleration;
 }
 
+void RAMPInit(RampState* ramp)
+{
+    ramp->speed = 0;
+}
+
 void RAMPSetAcceleration(RampState* state, float acceleration)
 {
     RAMPSetParams(state, acceleration, state->deceleration, state->minSpeed, state->maxSpeed);
@@ -65,61 +70,69 @@ static uint32_t DecelerationSpeedAt(const RampState* state, uint32_t distance)
     return sqrt(distance * 2.f * state->deceleration);
 }
 
-static void Decelerate(RampState* state)
+static void Decelerate(RampState* state, int32_t diff)
 {
-    state->speed -= (float)state->deceleration / state->speed;
+    float step = (float)state->deceleration / state->speed;
 
-    if (state->speed < 0.f) {
-        state->speed = 0.f;
-    } else if (state->speed < state->minSpeed) {
-        state->speed = state->minSpeed;
+    if (fabsf(state->speed) > fabsf(step) + state->minSpeed) {
+        state->speed -= step;
+    } else if ((diff > 0 && state->speed < 0) || (diff < 0 && state->speed > 0)) {
+        state->speed = 0;
+    } else {
+        state->speed = state->speed > 0 ? state->minSpeed : -state->minSpeed;
     }
 }
 
-uint32_t RAMPDecelerate(RampState* state)
+static bool_t Decelerating(const RampState* state, int32_t diff)
 {
-    Decelerate(state);
-    
-    return state->speed;
+    uint32_t absDiff = diff > 0 ? diff : -diff;
+
+    return (diff > 0 && state->speed < 0) ||
+           (diff < 0 && state->speed > 0) ||
+           ((absDiff <= state->decStepCount) && (fabsf(state->speed) > DecelerationSpeedAt(state, absDiff)));
+
 }
 
-uint32_t RAMPGetSpeed(RampState* state, uint32_t position, uint32_t targetPosition)
+static float Speed(float speed, int32_t diff)
 {
-    uint32_t absDiff = position > targetPosition ? position - targetPosition : targetPosition - position;
-    
-    DEBUG_OUT("%i", DecelerationSpeedAt(state, absDiff));
-    
-    if (absDiff == 0) {
+    return diff > 0 ? speed : -speed;
+}
+
+int32_t RAMPGetSpeed(RampState* state, uint32_t position, uint32_t targetPosition)
+{
+    int32_t diff = targetPosition - position;
+
+    if (diff == 0) {
     
         /* Stopped */
         DEBUG_OUT("%s", "stopped ");
         state->speed = 0.f;
         
-    } else if (absDiff <= state->decStepCount && state->speed > DecelerationSpeedAt(state, absDiff)) {
+    } else if (Decelerating(state, diff)) {
     
         /* Decelerating */
         DEBUG_OUT("%s", "declerating ");
-        Decelerate(state);
+        Decelerate(state, diff);
         
-    } else if (state->speed < state->maxSpeed) {
+    } else if (fabsf(state->speed) < state->maxSpeed) {
     
         /* Accelerating */
         DEBUG_OUT("%s", "accelerating ");
-        if (state->speed > 0) {
+        if (fabsf(state->speed) > 0) {
             state->speed += (float)state->acceleration / state->speed;
         } else {
-            state->speed = state->minSpeed;
+            state->speed = Speed(state->minSpeed, diff);
         }
             
-        if (state->maxSpeed > state->maxSpeed) {
-            state->speed = state->maxSpeed;
+        if (fabsf(state->maxSpeed) > state->maxSpeed) {
+            state->speed = Speed(state->maxSpeed, diff);
         }
         
     }  else {
     
         /* Running at max speed */
         DEBUG_OUT("%s", "maxSpeed ");
-        state->speed = state->maxSpeed;
+        state->speed = Speed(state->maxSpeed, diff);
     }
         
     return state->speed;

@@ -9,7 +9,7 @@
 #define RAMP_H
  
 #include <math.h>
-#include <inttypes.h>
+#include "types.h"
 
 typedef struct {
     uint32_t accStepCount;
@@ -32,7 +32,9 @@ extern void RAMPSetParams(
     uint32_t minSpeed,
     uint32_t maxSpeed);
     
-extern uint32_t RAMPGetSpeed(
+extern void RAMPInit(RampState* ramp);
+
+extern int32_t RAMPGetSpeed(
     RampState* state,
     uint32_t position,
     uint32_t targetPosition);
