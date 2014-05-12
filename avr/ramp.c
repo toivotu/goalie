@@ -70,16 +70,19 @@ static uint32_t DecelerationSpeedAt(const RampState* state, uint32_t distance)
     return sqrt(distance * 2.f * state->deceleration);
 }
 
+static float Speed(float speed, int32_t diff)
+{
+    return diff > 0 ? speed : -speed;
+}
+
 static void Decelerate(RampState* state, int32_t diff)
 {
     float step = (float)state->deceleration / state->speed;
 
     if (fabsf(state->speed) > fabsf(step) + state->minSpeed) {
         state->speed -= step;
-    } else if ((diff > 0 && state->speed < 0) || (diff < 0 && state->speed > 0)) {
-        state->speed = 0;
     } else {
-        state->speed = state->speed > 0 ? state->minSpeed : -state->minSpeed;
+        state->speed = Speed(state->minSpeed, diff);
     }
 }
 
@@ -91,11 +94,6 @@ static bool_t Decelerating(const RampState* state, int32_t diff)
            (diff < 0 && state->speed > 0) ||
            ((absDiff <= state->decStepCount) && (fabsf(state->speed) > DecelerationSpeedAt(state, absDiff)));
 
-}
-
-static float Speed(float speed, int32_t diff)
-{
-    return diff > 0 ? speed : -speed;
 }
 
 int32_t RAMPGetSpeed(RampState* state, uint32_t position, uint32_t targetPosition)
