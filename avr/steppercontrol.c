@@ -8,6 +8,7 @@
 #include <avr/io.h>
 #include <avr/sleep.h>
 #include <avr/pgmspace.h>
+#include <avr/interrupt.h>
 #include <util/delay.h>
 
 #include <stdlib.h>
@@ -97,7 +98,7 @@ static bool_t AtLeftEnd(void)
 
 static void StandardDelay(void)
 {
-    _delay_ms(10);
+    _delay_ms(5);
 }
 
 static void Clock(void)
@@ -193,6 +194,8 @@ void Init(void)
 
     UARTInit();
     InitTimer();
+
+    sei();
 }
 
 uint32_t UpdatePosition(uint32_t position, uint32_t targetPosition, RampState* ramp)

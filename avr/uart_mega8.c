@@ -7,8 +7,37 @@
 
 #include <avr/io.h>
 #include <avr/pgmspace.h>
+#include <avr/interrupt.h>
 
 #include "uart.h"
+
+#define BUFFER_SIZE 64
+
+static char rxBuffer[BUFFER_SIZE];
+static uint8_t rxHead = 0;
+static uint8_t rxTail = 0;
+
+static char txBuffer[BUFFER_SIZE];
+static uint8_t txHead = 0;
+static uint8_t txTail = 0;
+
+SIGNAL(USART_RX_vect)
+{
+    /* No overrun detection */
+    rxBuffer[rxHead] = UDR0;
+    rxHead += 1;
+    rxHead %= BUFFER_SIZE;
+}
+
+SIGNAL(USART_TX_vect)
+{
+    /* No overrun detection */
+    if (txHead != txTail) {
+        UDR0 = txBuffer[txTail];
+        txTail += 1;
+        txTail %= BUFFER_SIZE;
+    }
+}
 
 void UARTInit(void)
 {
@@ -21,13 +50,20 @@ void UARTInit(void)
     UBRR0L = 34;
 
     UCSR0A |= (1 << U2X0);
-    UCSR0B = (1 << RXEN0) | (1 << TXEN0);
+    UCSR0B = (1 << RXCIE0) | (1 << RXEN0) | (1 << TXCIE0) | (1 << TXEN0);
 }
 
 void UARTSendChar(char dataByte)
 {
-    while (~UCSR0A & (1 << UDRE0));
-    UDR0 = dataByte;
+    cli();
+    if (txHead == txTail && (UCSR0A & (1 << UDRE0)) != 0) {
+        UDR0 = dataByte;
+    } else {
+        txBuffer[txHead] = dataByte;
+        txHead += 1;
+        txHead %= BUFFER_SIZE;
+    }
+    sei();
 }
 
 void UARTSend(const char* data, uint8_t dataCount)
@@ -56,15 +92,20 @@ void UARTSendString(const char* str)
     }
 }
 
-/** Blocking read function */
 uint8_t UARTRead(void)
 {
-    while(!(UCSR0A & (1 << RXC0)));
+    char data = 0;
 
-    return UDR0;
+    if (rxHead != rxTail) {
+        data = rxBuffer[rxTail];
+        rxTail += 1;
+        rxTail %= BUFFER_SIZE;
+    }
+
+    return data;
 }
 
 bool_t UARTDataReady(void)
 {
-    return (UCSR0A & (1 << RXC0)) != 0;
+    return rxHead != rxTail;
 }
